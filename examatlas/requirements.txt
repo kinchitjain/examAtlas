@@ -1,0 +1,28 @@
+# Web framework
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-multipart==0.0.20
+slowapi==0.1.9
+
+# LangChain ecosystem
+langchain>=0.3.0
+langchain-anthropic>=0.3.0
+langchain-core>=0.3.0
+langsmith>=0.1.140
+
+# Config / validation
+pydantic==2.10.3
+pydantic-settings==2.6.1
+python-dotenv==1.0.1
+
+# HTTP
+httpx==0.28.1
+
+# Testing
+pytest==8.3.4
+pytest-asyncio==0.24.0
+
+# Redis async client
+redis[asyncio]>=5.0.0
+fastembed==0.4.2
+numpy>=1.26.0

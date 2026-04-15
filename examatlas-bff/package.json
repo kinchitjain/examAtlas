@@ -1,0 +1,19 @@
+{
+  "name": "examatlas-bff",
+  "version": "1.0.0",
+  "description": "Backend-for-Frontend proxy — sits between the React app and FastAPI backend",
+  "type": "module",
+  "scripts": {
+    "start": "node --import dotenv/config src/index.js",
+    "dev":   "node --import dotenv/config --watch src/index.js"
+  },
+  "dependencies": {
+    "express":            "^4.19.2",
+    "helmet":             "^7.1.0",
+    "cors":               "^2.8.5",
+    "express-rate-limit": "^7.3.1",
+    "jose":               "^5.6.3",
+    "uuid":               "^10.0.0",
+    "dotenv":             "^16.4.5"
+  }
+}
