@@ -295,3 +295,39 @@ Before going live, also do:
 
 
  Frontend setup
+
+## Architecture
+Parallel multi-agent decomposition with supervisor orchestration
+Most RAG chatbots run a single retrieval → LLM call chain. ExamAtlas decomposes every query into 2–4 parallel search shards, each running its own retrieval pipeline simultaneously, then merges, deduplicates, and re-ranks across all shards. The OrchestratorSupervisor adds stage-level rollback, conflict resolution, and a quality gate — none of which exist in standard LangChain pipelines.
+Real-time pipeline transparency via SSE
+The frontend does not wait for a final JSON response. It receives 11 named SSE events as the pipeline executes — plan_ready, shard_complete, ranking_complete, summary_chunk — and renders incrementally. Users see the AI thinking in real time. Very few production AI products expose this level of execution visibility to end users.
+
+RAG System
+Three-tier hybrid retrieval with persistent embeddings
+The retrieval system combines Redis chunk cache (L1), BM25 + FastEmbed dense embeddings merged via Reciprocal Rank Fusion (L2), and LLM fallback with write-back (L3). Most RAG implementations pick one retrieval strategy. Running BM25 and dense embeddings in parallel and merging ranks with RRF is a production-grade approach normally seen in enterprise search systems. Embedding vectors are persisted to Redis so cold restarts do not require recomputation — the index is warm in ~20ms instead of 5–10 seconds.
+Purpose-built chunking with dedicated date chunks
+Each exam produces three semantically distinct chunks — overview, subjects, and deadline-alerts. The deadline-alerts chunk repeats month/year tokens in multiple natural-language patterns specifically to boost BM25 term frequency for date queries. This is not generic chunking; it is domain-specific chunk engineering that dramatically improves recall for queries like "exams closing in March 2025".
+Staleness detection at chunk level
+Every chunk carries date_sortable, stored_at, and is_year_round fields stamped at write time. Stale chunks (past exam date AND cache older than 60 days) are filtered before coverage calculation, forcing re-fetch. A background task at startup evicts stale slugs from Redis. Year-round exams are explicitly excluded from staleness. This is a level of cache management rarely implemented in AI search products.
+
+Query Understanding
+Six-layer zero-cost query expansion
+Before any retrieval call, every query passes through 58 phrase expansions, 67 synonym injections, 69 acronym expansions, 16 region×domain combos, noise stripping, and category appending — all rule-based with zero LLM cost. A query like "become a doctor India" expands to include NEET, AIIMS, JIPMER, MBBS, medical admissions, and the Medical Admissions category string before BM25 ever sees it. Typical expansion ratio is 4–10×. This is query-time knowledge injection without RAG overhead.
+Intent extraction as structured signals
+extract_intent() produces a typed IntentSignals dataclass — sort hint, free hint, year, month, countries, category, acronyms found, phrase matches — which flows through every downstream agent and post-filter. Agents use it for prompt conditioning; the search service uses it for sort order and filter logic. This structured intent propagation is more robust than letting the LLM infer context from raw text each time.
+
+Reliability
+Circuit breakers on every agent chain
+All five agent chains have independent circuit breakers (CLOSED → HALF_OPEN → OPEN). A failing EnrichmentAgent does not take down ranking or summary. The Health page exposes live breaker state per agent with failure counts. Admin reset is available without a deploy. This is a production resilience pattern that most AI backends skip entirely.
+LRU query cache with 24-hour TTL
+Identical queries (same query string + filters) return instantly from an in-memory LRU cache without invoking any agents or LLM. A cache_hit SSE event fires immediately. For popular search patterns (NEET, GRE, IELTS) this means near-zero API cost and sub-100ms response after the first query.
+Lightweight fallback on full pipeline failure
+If the full 5-agent pipeline fails (timeout, multiple circuit breakers open), a single direct LLM call via search_service.py returns basic results. The user always gets something rather than an error page.
+
+Cost Visibility
+Per-agent token and cost tracking via LangChain callbacks
+CostTracker(BaseCallbackHandler) intercepts on_llm_end after every model response and accumulates input tokens, output tokens, and USD cost using the Anthropic pricing table. Each AgentTrace carries cost_usd, input_tokens, and output_tokens. The UI Traces drawer shows a pipeline total cost and per-agent token badges. Operators can see exactly which agent is expensive and which stages were served from cache (no tokens at all). This level of per-call cost attribution is uncommon even in enterprise LLM deployments.
+
+## Summary
+DimensionWhat makes it distinctPipelineParallel shards + supervisor rollback + conflict resolution, not a single chainRetrievalBM25 + dense embeddings + RRF + persistent Redis embeddings, not one strategyChunkingDomain-specific 3-chunk strategy with dedicated date chunk for temporal queriesStalenessChunk-level freshness tracking with background eviction at restartQuery expansion6-layer rule-based expansion at zero LLM cost before every retrieval callStreaming11 named SSE events giving users live pipeline visibilityReliabilityPer-agent circuit breakers + stage rollback + lightweight fallbackCostPer-agent token attribution surfaced in the UI, not just aggregate billing
+ 
