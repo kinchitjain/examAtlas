@@ -329,5 +329,12 @@ Per-agent token and cost tracking via LangChain callbacks
 CostTracker(BaseCallbackHandler) intercepts on_llm_end after every model response and accumulates input tokens, output tokens, and USD cost using the Anthropic pricing table. Each AgentTrace carries cost_usd, input_tokens, and output_tokens. The UI Traces drawer shows a pipeline total cost and per-agent token badges. Operators can see exactly which agent is expensive and which stages were served from cache (no tokens at all). This level of per-call cost attribution is uncommon even in enterprise LLM deployments.
 
 ## Summary
-DimensionWhat makes it distinctPipelineParallel shards + supervisor rollback + conflict resolution, not a single chainRetrievalBM25 + dense embeddings + RRF + persistent Redis embeddings, not one strategyChunkingDomain-specific 3-chunk strategy with dedicated date chunk for temporal queriesStalenessChunk-level freshness tracking with background eviction at restartQuery expansion6-layer rule-based expansion at zero LLM cost before every retrieval callStreaming11 named SSE events giving users live pipeline visibilityReliabilityPer-agent circuit breakers + stage rollback + lightweight fallbackCostPer-agent token attribution surfaced in the UI, not just aggregate billing
+DimensionWhat makes it distinct
+Pipeline    Parallel shards + supervisor rollback + conflict resolution, not a single chain
+Retrieval   BM25 + dense embeddings + RRF + persistent Redis embeddings, not one strategy
+Chunking    Domain-specific 3-chunk strategy with dedicated date chunk for temporal queries
+Staleness   Chunk-level freshness tracking with background eviction at restartQuery expansion6-layer rule-based expansion at zero LLM cost before every retrieval call
+Streaming   11 named SSE events giving users live pipeline visibility
+Reliability Per-agent circuit breakers + stage rollback + lightweight fallback
+Cost        Per-agent token attribution surfaced in the UI, not just aggregate billing
  
